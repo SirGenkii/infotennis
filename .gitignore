@@ -31,3 +31,7 @@ analysis/*
 notebooks/*.png
 images/*.png
 images/assets/
+
+.cache/
+.history/
+debug/

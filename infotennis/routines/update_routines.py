@@ -173,6 +173,9 @@ def run_update_routines(conn, database_name, data_dir, data_path, data_type="all
     logging.info(f"ATP infotennis update routine has completed at {str(pd.Timestamp.utcnow())} (UTC).")
     logging.info(f"===================================================================")   
 
+
+
+
 if __name__ == "__main__":
     try:
         run_update_routines(conn, database_name, data_dir, data_path, data_type="all", insert=True)

@@ -9,3 +9,5 @@ webdriver-manager
 pyyaml
 pymysql
 func-timeout
+dotenv
+python-dotenv

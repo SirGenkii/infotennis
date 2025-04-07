@@ -12,6 +12,7 @@ import os
 import numpy as np
 import pandas as pd
 import yaml
+import re
 
 from infotennis.processing.processing_keystats import process_key_stats
 from infotennis.processing.processing_rallys import process_rally_analysis
@@ -19,7 +20,7 @@ from infotennis.processing.processing_strokes import process_stroke_analysis
 from infotennis.processing.processing_courtvision import process_court_vision
 
 
-# Suppress "WDM INFO ====== WebDriver manager ======" messages
+# Suppress "WDM INFO ====== WebDriver manager ======" messagesdf_stats_processed
 os.environ['WDM_LOG_LEVEL'] = '0'
 
 
@@ -33,13 +34,13 @@ table_dtypes_all = {
                 player2_nation VARCHAR(255), score VARCHAR(255), url VARCHAR(255), court_vision INT",
     "key_stats": "year INT, tournament_id VARCHAR(32), match_id VARCHAR(32), round VARCHAR(32), sets_completed INT, set_n INT,\
                 player_id VARCHAR(32), opponent_id VARCHAR(32), serve_rating INT, aces INT, serves_unreturned INT, double_faults INT,\
-                serve1 VARCHAR(32), serve1_pct FLOAT, serve1_pts_won VARCHAR(32), serve1_pts_won_pct FLOAT, serve2_pts_won VARCHAR(32),\
-                serve2_pts_won_pct FLOAT, break_points_saved VARCHAR(32), break_points_saved_pct FLOAT, service_games_played INT,\
-                return_rating INT, serve1_return_pts_won VARCHAR(32), serve1_return_pts_won_pct FLOAT, serve2_return_pts_won VARCHAR(32),\
-                serve2_return_pts_won_pct FLOAT, break_points_converted VARCHAR(32), break_points_converted_pct FLOAT, break_points_faced INT,\
-                return_games_played INT, net_points_won VARCHAR(32), net_points_won_pct FLOAT, winners INT, unforced_errors INT,\
-                service_points_won VARCHAR(32), service_points_won_pct FLOAT, return_points_won VARCHAR(32), return_points_won_pct FLOAT,\
-                total_points_won VARCHAR(32), total_points_won_pct FLOAT, max_speed INT, serve1_avg_speed INT, serve2_avg_speed INT",
+                serve1 VARCHAR(32), serve1_pct DOUBLE, serve1_pts_won VARCHAR(32), serve1_pts_won_pct DOUBLE, serve2_pts_won VARCHAR(32),\
+                serve2_pts_won_pct DOUBLE, break_points_saved VARCHAR(32), break_points_saved_pct DOUBLE, service_games_played INT,\
+                return_rating INT, serve1_return_pts_won VARCHAR(32), serve1_return_pts_won_pct DOUBLE, serve2_return_pts_won VARCHAR(32),\
+                serve2_return_pts_won_pct DOUBLE, break_points_converted VARCHAR(32), break_points_converted_pct DOUBLE, break_points_faced INT,\
+                return_games_played INT, net_points_won VARCHAR(32), net_points_won_pct DOUBLE, winners INT, unforced_errors INT,\
+                service_points_won VARCHAR(32), service_points_won_pct DOUBLE, return_points_won VARCHAR(32), return_points_won_pct DOUBLE,\
+                total_points_won VARCHAR(32), total_points_won_pct DOUBLE, max_speed INT, serve1_avg_speed INT, serve2_avg_speed INT",
     "rally_analysis": "year INT, tournament_id VARCHAR(32), match_id VARCHAR(32), round VARCHAR(32), sets_completed INT,\
                 shot_number VARCHAR(32), outcome VARCHAR(32), player_id VARCHAR(32), opponent_id VARCHAR(32), crucial_point TINYINT,\
                 score VARCHAR(32), hand VARCHAR(32), point_end_type VARCHAR(32), point_id VARCHAR(32), serve INT, serve_dir VARCHAR(32),\
@@ -50,13 +51,13 @@ table_dtypes_all = {
                 player_id VARCHAR(32), opponent_id VARCHAR(32), hand VARCHAR(32), shot_type VARCHAR(32), winners INT, errors INT,\
                 unforced_errors INT, others INT",
     "court_vision": "year INT, tournament_id VARCHAR(32), match_id VARCHAR(32), round VARCHAR(32), p1_id VARCHAR(32), p2_id VARCHAR(32),\
-                point_id VARCHAR(32), server_id VARCHAR(32), scorer_id VARCHAR(32), receiver_id VARCHAR(32), ball_speed_kmh FLOAT,\
+                point_id VARCHAR(32), server_id VARCHAR(32), scorer_id VARCHAR(32), receiver_id VARCHAR(32), ball_speed_kmh DOUBLE,\
                 rally_length INT, point_end_type VARCHAR(32), stroke_type VARCHAR(32), serve_type VARCHAR(32), court VARCHAR(32),\
                 set_n INT, game INT, point INT, serve INT, hand VARCHAR(32), break_point TINYINT, break_point_converted TINYINT,\
                 p1_sets_w INT, p2_sets_w INT, p1_set_score INT, p2_set_score INT, p1_game_score VARCHAR(32), p2_game_score VARCHAR(32),\
-                is_tiebreak INT, stroke_idx INT, x_hit FLOAT, y_hit FLOAT, z_hit FLOAT, x_peak_pre FLOAT, y_peak_pre FLOAT,\
-                z_peak_pre FLOAT, x_net FLOAT, y_net FLOAT, z_net FLOAT, x_bounce FLOAT, y_bounce FLOAT, z_bounce FLOAT, x_peak_post FLOAT,\
-                y_peak_post FLOAT, z_peak_post FLOAT"
+                is_tiebreak INT, stroke_idx INT, x_hit DOUBLE, y_hit DOUBLE, z_hit DOUBLE, x_peak_pre DOUBLE, y_peak_pre DOUBLE,\
+                z_peak_pre DOUBLE, x_net DOUBLE, y_net DOUBLE, z_net DOUBLE, x_bounce DOUBLE, y_bounce DOUBLE, z_bounce DOUBLE, x_peak_post DOUBLE,\
+                y_peak_post DOUBLE, z_peak_post DOUBLE"
 }
 
 def initalise_tables(mycursor, database_name, table="all"):
@@ -195,6 +196,36 @@ def insert_results_data_new(mycursor, conn, database_name, table, dataframe, bat
     return
 
 
+def extract_percentage(val):
+    """
+    Extrait le quotien de la chaîne de caractères.
+    Exemple : "26/40 (65%)" -> 0.65 ou "26/40" -> 0.65
+    Si la chaîne ne correspond pas au format attendu, on essaie de la convertir directement en float.
+    """
+    
+    #if already a float, return it as is
+    if isinstance(val, float):
+        return val
+    
+    # Utiliser une expression régulière pour extraire le quotient
+    match = re.search(r'(\d+)/(\d+)', val)
+    if match:
+        numerator = float(match.group(1))
+        denominator = float(match.group(2))
+        
+        if denominator == 0:
+            return float(0) # Éviter la division par zéro
+        
+        return numerator / denominator
+    else:
+        # Si la chaîne ne correspond pas au format attendu, essayer de convertir directement en float
+        try:
+            return float(val)
+        except ValueError:
+            return np.nan  # ou une autre valeur par défaut si nécessaire
+  
+
+
 def update_stat_tables_from_files(df_results_update, data_type, database_name, table, mycursor, conn, data_dir, data_path, insert=True):
     """
     Update MySQL tables with tennis statistics data from raw data files.
@@ -289,7 +320,57 @@ def update_stat_tables_from_files(df_results_update, data_type, database_name, t
             logging.error(f"Unrecognised data_type {data_type} provided.")
             return
         
+        
+        
+        # print(df_stats_processed['serve1_pts_won_pct'])
+        # print(df_stats_processed['serve1_pct'])
+        
+        # save the processed data to csv file for debugging purposes
+        
+        df_stats_processed.to_csv(f"debug/processed_{data_type}_{year}_{tourn_id}_{match_id}_beforeclean.csv", index=False)
+
+
+        if data_type == "key-stats":
+
+            df_stats_processed['serve1'] = df_stats_processed['serve1'].apply(extract_percentage).round(5) 
+            df_stats_processed['serve1_pct'] = (df_stats_processed['serve1_pct'].apply(extract_percentage) * 100).round(5)
+            
+            df_stats_processed['serve1_pts_won'] = df_stats_processed['serve1_pts_won'].apply(extract_percentage).round(5)
+            df_stats_processed['serve1_pts_won_pct'] = (df_stats_processed['serve1_pts_won_pct'].apply(extract_percentage) * 100).round(5)
+            
+            df_stats_processed['serve2_pts_won'] = df_stats_processed['serve2_pts_won'].apply(extract_percentage).round(5)
+            df_stats_processed['serve2_pts_won_pct'] = (df_stats_processed['serve2_pts_won_pct'].apply(extract_percentage) * 100).round(5)
+            
+            df_stats_processed['break_points_saved'] = df_stats_processed['break_points_saved'].apply(extract_percentage).round(5)
+            df_stats_processed['break_points_saved_pct'] = (df_stats_processed['break_points_saved_pct'].apply(extract_percentage) * 100).round(5)
+            
+            df_stats_processed['serve1_return_pts_won'] = df_stats_processed['serve1_return_pts_won'].apply(extract_percentage).round(5)
+            df_stats_processed['serve1_return_pts_won_pct'] = (df_stats_processed['serve1_return_pts_won_pct'].apply(extract_percentage) * 100).round(5)
+            
+            df_stats_processed['serve2_return_pts_won'] = df_stats_processed['serve2_return_pts_won'].apply(extract_percentage).round(5)
+            df_stats_processed['serve2_return_pts_won_pct'] = (df_stats_processed['serve2_return_pts_won_pct'].apply(extract_percentage) * 100).round(5)
+            
+            df_stats_processed['break_points_converted'] = df_stats_processed['break_points_converted'].apply(extract_percentage).round(5)
+            df_stats_processed['break_points_converted_pct'] = (df_stats_processed['break_points_converted_pct'].apply(extract_percentage) * 100).round(5)
+            
+            df_stats_processed['service_points_won'] = df_stats_processed['service_points_won'].apply(extract_percentage).round(5)
+            df_stats_processed['service_points_won_pct'] = (df_stats_processed['service_points_won_pct'].apply(extract_percentage) * 100).round(5)
+            
+            df_stats_processed['return_points_won'] = df_stats_processed['return_points_won'].apply(extract_percentage).round(5)
+            df_stats_processed['return_points_won_pct'] = (df_stats_processed['return_points_won_pct'].apply(extract_percentage) * 100).round(5)
+            
+            df_stats_processed['total_points_won'] = df_stats_processed['total_points_won'].apply(extract_percentage).round(5)
+            df_stats_processed['total_points_won_pct'] = (df_stats_processed['total_points_won_pct'].apply(extract_percentage) * 100).round(5)
+            
+            df_stats_processed['net_points_won'] = df_stats_processed['net_points_won'].apply(extract_percentage).round(5)
+            df_stats_processed['net_points_won_pct'] = (df_stats_processed['net_points_won_pct'].apply(extract_percentage) * 100).round(5)
+            
+               
         df_stats_processed = df_stats_processed.replace({np.nan: -999})
+        
+    
+        df_stats_processed.to_csv(f"debug/processed_{data_type}_{year}_{tourn_id}_{match_id}_afterclean.csv", index=False)
+
         if insert:
             if data_type != "key-stats":
                 insert_results_data_new(mycursor, conn, database_name, table, df_stats_processed, batch=False)

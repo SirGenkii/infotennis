@@ -23,6 +23,7 @@ with open("./config.yaml", "r") as yamlfile:
     configs = yaml.safe_load(yamlfile)
 
 data_dir = configs["output"]['dir']
+csv_export_database_dir = configs["output"]['csv_export_database_dir']
 data_path = configs["output"]['path']
 log_dir = configs["log"]['dir']
 
@@ -169,6 +170,59 @@ def run_update_routines(conn, database_name, data_dir, data_path, data_type="all
     et = time.time()
     elapsed_time = et - st
     print(f"Completed Routine Step 4 in {elapsed_time} seconds.")
+    
+    #step 5 custom - export all tables to csv
+    print(f"Running Routine Step 5: Export all tables to CSV.")
+    st = time.time()
+    #breakpoint()
+    
+    
+    today = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    
+    # Export all tables to CSV
+    tables = [table_cal, table_results] + list(table_stats.values())
+    for table in tables:
+        # Export the table to a CSV file
+        query = f"SELECT * FROM {table}"
+        df = pd.read_sql(query, conn)
+
+       
+        #create directory with current date if it doesn't exist
+        csv_with_date_dir = os.path.join(csv_export_database_dir, today)
+        os.makedirs(csv_with_date_dir, exist_ok=True)
+
+        # Define the output file path
+        output_file = os.path.join(csv_with_date_dir, f"{table}.csv")
+        # Save the DataFrame to a CSV file
+        df.to_csv(output_file, index=False)
+        
+        
+    # step 6 custom - share csv files to local Genkii/TennisNeuralNetwork directory from config.yaml genkii_tennisNN_local_dir
+    
+    print(f"Running Routine Step 6: Share CSV files to local Genkii/TennisNeuralNetwork directory.")
+    st = time.time()
+    #breakpoint()
+    
+    genkii_tennisNN_local_dir = configs["output"]['genkii_tennisNN_local_dir']
+    
+    #return error if directory does not exist
+    if not os.path.exists(genkii_tennisNN_local_dir):
+        print(f"Directory {genkii_tennisNN_local_dir} does not exist!")
+        return
+    
+    tennisNN_destination_dir = os.path.join(genkii_tennisNN_local_dir, today)
+    os.makedirs(tennisNN_destination_dir, exist_ok=True)
+
+    #copy csv files to genkii_tennisNN_local_dir
+    for table in tables:
+        # Define the source and destination file paths
+        source_file = os.path.join(csv_with_date_dir, f"{table}.csv")
+        destination_file = os.path.join(tennisNN_destination_dir, f"{table}.csv")
+        
+        # Copy the file to the destination directory (windows)
+        os.system(f'copy "{source_file}" "{destination_file}"')        
+ 
+    
     print(f"ATP infotennis update routine has completed at {str(pd.Timestamp.utcnow())} (UTC). Please view logfile for summary.") 
     logging.info(f"ATP infotennis update routine has completed at {str(pd.Timestamp.utcnow())} (UTC).")
     logging.info(f"===================================================================")   

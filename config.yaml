@@ -4,6 +4,10 @@
 output:
   dir:
     ./data/
+  csv_export_database_dir:
+    ./data/csv_export_database/
+  genkii_tennisNN_local_dir:
+    E:/Documents_/Dev/TennisNeuralNetwork/data/infotennis/
   path:
     "<data_type>/raw/<year>/"
 # Logfile
@@ -17,6 +21,9 @@ atp:
     https://www.atptour.com/en/scores/results-archive?year=%(year)s
   key-stats:
     https://itp-atp-sls.infosys-platforms.com/static/prod/stats-plus/%(year)s/%(tourn_id)s/%(match_id)s/keystats.json
+
+
+
   rally-analysis:
     https://itp-atp-sls.infosys-platforms.com/static/prod/rally-analysis/%(year)s/%(tourn_id)s/%(match_id)s/data.json
   stroke-analysis:
